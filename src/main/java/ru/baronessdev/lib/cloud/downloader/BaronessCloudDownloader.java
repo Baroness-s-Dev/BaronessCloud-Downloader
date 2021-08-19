@@ -73,7 +73,7 @@ public final class BaronessCloudDownloader extends JavaPlugin {
         }
 
         try {
-            Bukkit.getPluginManager().loadPlugin(pluginFile);
+            if (Bukkit.getPluginManager().getPlugin("BaronessCloud") == null) Bukkit.getPluginManager().loadPlugin(pluginFile);
         } catch (InvalidPluginException | InvalidDescriptionException e) {
             System.out.println(ChatColor.RED + "Could not load BaronessCloud: " + e.getMessage());
             return downloadResult = false;
