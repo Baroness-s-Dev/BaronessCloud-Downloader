@@ -6,24 +6,30 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.plugin.InvalidDescriptionException;
 import org.bukkit.plugin.InvalidPluginException;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import javax.xml.bind.DatatypeConverter;
 import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
-public final class BaronessCloudDownloader extends JavaPlugin {
+public final class BaronessCloudDownloader {
 
     private static boolean alreadyDownloaded = false;
     private static boolean downloadResult = false;
 
+    private static boolean pluginEnabled = false;
+    private static Thread enableCheckerThread = null;
+    private static final List<Runnable> callbacks = new ArrayList<>();
+
     @SuppressWarnings({"ResultOfMethodCallIgnored"})
-    public synchronized static boolean call() {
-        if (alreadyDownloaded) return downloadResult;
+    public synchronized static void call(Runnable callback) {
+        if (alreadyDownloaded && downloadResult) {
+            runCallback(callback);
+        }
         alreadyDownloaded = true;
 
         File pluginFile = new File("plugins" + File.separator + "BaronessCloud.jar");
@@ -32,12 +38,14 @@ public final class BaronessCloudDownloader extends JavaPlugin {
         tempDir.mkdirs();
 
         if (!pluginFile.exists() && !download(pluginFile)) {
-            return downloadResult = false;
+            downloadResult = false;
+            return;
         }
 
         String hash = downloadHash(tempDir);
         if (hash.isEmpty()) {
-            return downloadResult = false;
+            downloadResult = false;
+            return;
         }
 
         String currentHash;
@@ -59,26 +67,63 @@ public final class BaronessCloudDownloader extends JavaPlugin {
             currentHash = sb.toString().toUpperCase();
         } catch (Exception e) {
             System.out.println(ChatColor.RED + "Could not calc BaronessCloud hash: " + e.getMessage());
-            return downloadResult = false;
+            downloadResult = false;
+            return;
         }
 
         if (!hash.equals(currentHash)) {
             pluginFile.delete();
+
             Optional.ofNullable(Bukkit.getPluginManager().getPlugin("BaronessCloud")).ifPresent(plugin ->
                     Bukkit.getPluginManager().disablePlugin(plugin));
 
             if (!download(pluginFile)) {
-                return downloadResult = false;
+                downloadResult = false;
+                return;
             }
         }
 
         try {
-            if (Bukkit.getPluginManager().getPlugin("BaronessCloud") == null) Bukkit.getPluginManager().loadPlugin(pluginFile);
+            if (!Bukkit.getPluginManager().isPluginEnabled("BaronessCloud")) {
+                Bukkit.getPluginManager().loadPlugin(pluginFile);
+            }
         } catch (InvalidPluginException | InvalidDescriptionException e) {
             System.out.println(ChatColor.RED + "Could not load BaronessCloud: " + e.getMessage());
-            return downloadResult = false;
+            downloadResult = false;
+            return;
         }
-        return downloadResult = true;
+
+        downloadResult = true;
+        runCallback(callback);
+    }
+
+    private static void runCallback(Runnable callback) {
+        if (pluginEnabled) {
+            callback.run();
+            return;
+        }
+
+        callbacks.add(callback);
+
+        if (enableCheckerThread == null) {
+            enableCheckerThread = new Thread(() -> {
+                while (!pluginEnabled) {
+                    if (Bukkit.getPluginManager().isPluginEnabled("BaronessCloud")) {
+                        pluginEnabled = true;
+                        callbacks.forEach(BaronessCloudDownloader::runCallback);
+                        callbacks.clear();
+                        return;
+                    }
+
+                    try {
+                        //noinspection BusyWait
+                        Thread.sleep(500);
+                    } catch (InterruptedException ignored) {
+                    }
+                }
+            });
+            enableCheckerThread.start();
+        }
     }
 
     @SuppressWarnings("UnstableApiUsage")
