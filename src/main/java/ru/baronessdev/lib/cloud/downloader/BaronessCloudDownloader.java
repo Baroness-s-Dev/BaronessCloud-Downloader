@@ -21,7 +21,7 @@ public final class BaronessCloudDownloader extends JavaPlugin {
     private static boolean downloadResult = false;
 
     @SuppressWarnings({"ResultOfMethodCallIgnored"})
-    public synchronized boolean call() {
+    public synchronized static boolean call() {
         if (alreadyDownloaded) return downloadResult;
         alreadyDownloaded = true;
 
