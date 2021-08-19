@@ -14,6 +14,7 @@ import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.Optional;
 
 public final class BaronessCloudDownloader extends JavaPlugin {
 
@@ -24,11 +25,6 @@ public final class BaronessCloudDownloader extends JavaPlugin {
     public synchronized static boolean call() {
         if (alreadyDownloaded) return downloadResult;
         alreadyDownloaded = true;
-
-        Plugin baronessCloudPlugin = Bukkit.getPluginManager().getPlugin("BaronessCloud");
-        if (baronessCloudPlugin != null) {
-            Bukkit.getPluginManager().disablePlugin(baronessCloudPlugin);
-        }
 
         File pluginFile = new File("plugins" + File.separator + "BaronessCloud.jar");
         File tempDir = new File("plugins" + File.separator + "BaronessCloud" + File.separator + "temp");
@@ -68,6 +64,8 @@ public final class BaronessCloudDownloader extends JavaPlugin {
 
         if (!hash.equals(currentHash)) {
             pluginFile.delete();
+            Optional.ofNullable(Bukkit.getPluginManager().getPlugin("BaronessCloud")).ifPresent(plugin ->
+                    Bukkit.getPluginManager().disablePlugin(plugin));
 
             if (!download(pluginFile)) {
                 return downloadResult = false;
