@@ -53,7 +53,14 @@ public final class BaronessCloudDownloader extends JavaPlugin {
                 digest.update(block, 0, length);
             }
 
-            currentHash = DatatypeConverter.printHexBinary(digest.digest());
+            byte[] bytes = digest.digest();
+            StringBuilder sb = new StringBuilder(2 * bytes.length);
+            for (byte b : bytes) {
+                sb.append("0123456789ABCDEF".charAt((b & 0xF0) >> 4));
+                sb.append("0123456789ABCDEF".charAt((b & 0x0F)));
+            }
+
+            currentHash = sb.toString().toUpperCase();
         } catch (Exception e) {
             System.out.println(ChatColor.RED + "Could not calc BaronessCloud hash: " + e.getMessage());
             return downloadResult = false;
