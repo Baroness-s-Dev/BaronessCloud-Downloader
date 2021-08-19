@@ -1,0 +1,4 @@
+name: BaronessCloudDownloader
+version: ${project.version}
+main: ru.baronessdev.lib.cloud.downloader.BaronessCloudDownloader
+website: baronessdev.ru
