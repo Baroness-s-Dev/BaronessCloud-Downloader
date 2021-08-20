@@ -4,16 +4,11 @@ import com.google.common.io.MoreFiles;
 import com.google.common.io.RecursiveDeleteOption;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.plugin.InvalidDescriptionException;
-import org.bukkit.plugin.InvalidPluginException;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
 import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 public final class BaronessCloudDownloader {
@@ -21,14 +16,10 @@ public final class BaronessCloudDownloader {
     private static boolean alreadyDownloaded = false;
     private static boolean downloadResult = false;
 
-    private static boolean pluginEnabled = false;
-    private static Thread enableCheckerThread = null;
-    private static final List<Runnable> callbacks = new ArrayList<>();
-
     @SuppressWarnings({"ResultOfMethodCallIgnored"})
     public synchronized static void call(Runnable callback) {
         if (alreadyDownloaded && downloadResult) {
-            runCallback(callback);
+            callback.run();
         }
         alreadyDownloaded = true;
 
@@ -71,6 +62,8 @@ public final class BaronessCloudDownloader {
             return;
         }
 
+        cleanup(tempDir);
+
         if (!hash.equals(currentHash)) {
             pluginFile.delete();
 
@@ -83,47 +76,8 @@ public final class BaronessCloudDownloader {
             }
         }
 
-        try {
-            if (!Bukkit.getPluginManager().isPluginEnabled("BaronessCloud")) {
-                Bukkit.getPluginManager().loadPlugin(pluginFile);
-            }
-        } catch (InvalidPluginException | InvalidDescriptionException e) {
-            System.out.println(ChatColor.RED + "Could not load BaronessCloud: " + e.getMessage());
-            downloadResult = false;
-            return;
-        }
-
-        downloadResult = true;
-        runCallback(callback);
-    }
-
-    private static void runCallback(Runnable callback) {
-        if (pluginEnabled) {
-            callback.run();
-            return;
-        }
-
-        callbacks.add(callback);
-
-        if (enableCheckerThread == null) {
-            enableCheckerThread = new Thread(() -> {
-                while (!pluginEnabled) {
-                    if (Bukkit.getPluginManager().isPluginEnabled("BaronessCloud")) {
-                        pluginEnabled = true;
-                        callbacks.forEach(BaronessCloudDownloader::runCallback);
-                        callbacks.clear();
-                        return;
-                    }
-
-                    try {
-                        //noinspection BusyWait
-                        Thread.sleep(500);
-                    } catch (InterruptedException ignored) {
-                    }
-                }
-            });
-            enableCheckerThread.start();
-        }
+        downloadResult = Bukkit.getPluginManager().isPluginEnabled("BaronessCloud");
+        if (downloadResult) callback.run();
     }
 
     @SuppressWarnings("UnstableApiUsage")
