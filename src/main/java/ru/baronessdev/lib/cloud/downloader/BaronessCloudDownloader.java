@@ -1,11 +1,10 @@
 package ru.baronessdev.lib.cloud.downloader;
 
-import com.google.common.io.MoreFiles;
-import com.google.common.io.RecursiveDeleteOption;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -24,16 +23,23 @@ public final class BaronessCloudDownloader {
         alreadyDownloaded = true;
 
         File pluginFile = new File("plugins" + File.separator + "BaronessCloud.jar");
-        File tempDir = new File("plugins" + File.separator + "BaronessCloud" + File.separator + "temp");
-        cleanup(tempDir);
-        tempDir.mkdirs();
+
+        Class<?> cloudClass;
+        try {
+            cloudClass = Class.forName("ru.baronessdev.lib.cloud.BaronessCloud");
+            pluginFile = new File(cloudClass.getProtectionDomain()
+                    .getCodeSource()
+                    .getLocation()
+                    .getPath());
+        } catch (ClassNotFoundException ignored) {
+        }
 
         if (!pluginFile.exists() && !download(pluginFile)) {
             downloadResult = false;
             return;
         }
 
-        String hash = downloadHash(tempDir);
+        String hash = getHash();
         if (hash.isEmpty()) {
             downloadResult = false;
             return;
@@ -62,8 +68,6 @@ public final class BaronessCloudDownloader {
             return;
         }
 
-        cleanup(tempDir);
-
         if (!hash.equals(currentHash)) {
             pluginFile.delete();
 
@@ -80,16 +84,6 @@ public final class BaronessCloudDownloader {
         if (downloadResult) callback.run();
     }
 
-    @SuppressWarnings("UnstableApiUsage")
-    private static void cleanup(File tempDir) {
-        if (tempDir.exists()) {
-            try {
-                MoreFiles.deleteRecursively(tempDir.toPath(), RecursiveDeleteOption.ALLOW_INSECURE);
-            } catch (IOException ignored) {
-            }
-        }
-    }
-
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean download(File pluginFile) {
         try {
@@ -101,15 +95,14 @@ public final class BaronessCloudDownloader {
         }
     }
 
-    private static String downloadHash(File tempDir) {
+    private static String getHash() {
         try {
-            File hashFile = new File(tempDir.getAbsolutePath() + File.separator + "BaronessCloud.sha256");
-            Files.copy(new URL("https://github.com/Baroness-s-Dev/BaronessCloud/releases/latest/download/BaronessCloud.sha256").openStream(),
-                    hashFile.toPath());
+            HttpURLConnection connection = (HttpURLConnection) new URL("https://github.com/Baroness-s-Dev/BaronessCloud/releases/latest/download/BaronessCloud.sha256").openConnection();
+            BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()));
 
-            BufferedReader br = new BufferedReader(new FileReader(hashFile));
             String hash = br.readLine().toUpperCase();
             br.close();
+            connection.disconnect();
             return hash;
         } catch (Exception e) {
             System.out.println(ChatColor.RED + "Could not download BaronessCloud hash: " + e.getMessage());
